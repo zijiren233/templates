@@ -23,6 +23,12 @@ spec:
     app_name1:
       type: string
       value: headscale-${{ random(8) }}
+  inputs:
+    domain:
+      description: 'cname to headscale-${{ defaults.app_suffix }}.${{ SEALOS_CLOUD_DOMAIN }}'
+      type: string
+      default: ""
+      required: true
 
 ---
 apiVersion: apps/v1
@@ -53,15 +59,15 @@ spec:
       automountServiceAccountToken: false
       containers:
         - name: headscale-${{ defaults.app_suffix }}
-          image: headscale/headscale:0.23.0-alpha12-debug
+          image: headscale/headscale:0.23.0-beta1-debug
           command: ["headscale", "serve"]
           resources:
             requests:
-              cpu: 10m
-              memory: 6Mi
-            limits:
-              cpu: 100m
+              cpu: 50m
               memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
           ports:
             - name: http
               protocol: TCP
@@ -147,7 +153,7 @@ data:
     #
     # https://myheadscale.example.com:443
     #
-    server_url: https://headscale-${{ defaults.app_suffix }}.${{ SEALOS_CLOUD_DOMAIN }}
+    server_url: https://${{ inputs.domain || 'headscale-' + defaults.app_suffix + '.' + SEALOS_CLOUD_DOMAIN }}
     
     # Address to listen to / bind to on the server
     #
@@ -518,7 +524,7 @@ metadata:
       }
 spec:
   rules:
-    - host: headscale-${{ defaults.app_suffix }}.${{ SEALOS_CLOUD_DOMAIN }}
+    - host: ${{ inputs.domain || 'headscale-' + defaults.app_suffix + '.' + SEALOS_CLOUD_DOMAIN }}
       http:
         paths:
           - pathType: Prefix
@@ -530,8 +536,8 @@ spec:
                   number: 8080
   tls:
     - hosts:
-        - headscale-${{ defaults.app_suffix }}.${{ SEALOS_CLOUD_DOMAIN }}
-      secretName: ${{ SEALOS_CERT_SECRET_NAME }}
+        - ${{ inputs.domain || 'headscale-' + defaults.app_suffix + '.' + SEALOS_CLOUD_DOMAIN }}
+      secretName: "${{ defaults.app_name ? defaults.app_name + '-cert' : SEALOS_CERT_SECRET_NAME }}"
 
 ---
 apiVersion: networking.k8s.io/v1
@@ -560,7 +566,7 @@ metadata:
         add_header Cache-Control "public";
 spec:
   rules:
-    - host: headscale-${{ defaults.app_suffix }}.${{ SEALOS_CLOUD_DOMAIN }}
+    - host: ${{ inputs.domain || 'headscale-' + defaults.app_suffix + '.' + SEALOS_CLOUD_DOMAIN }}
       http:
         paths:
           - pathType: Exact
@@ -572,8 +578,8 @@ spec:
                   number: 80
   tls:
     - hosts:
-        - headscale-${{ defaults.app_suffix }}.${{ SEALOS_CLOUD_DOMAIN }}
-      secretName: ${{ SEALOS_CERT_SECRET_NAME }}
+        - ${{ inputs.domain || 'headscale-' + defaults.app_suffix + '.' + SEALOS_CLOUD_DOMAIN }}
+      secretName: "${{ defaults.app_name ? defaults.app_name + '-cert' : SEALOS_CERT_SECRET_NAME }}"
 
 ---
 apiVersion: networking.k8s.io/v1
@@ -636,14 +642,14 @@ spec:
       automountServiceAccountToken: false
       containers:
         - name: headscale-admin-${{ defaults.app_suffix }}
-          image: goodieshq/headscale-admin:0.1.12b
+          image: goodieshq/headscale-admin@sha256:89d27f34b67065f47cfa16e7d24cf34ca5d18aee8c54dbc2e73d619548a44051
           resources:
             requests:
               cpu: 50m
-              memory: 51Mi
+              memory: 64Mi
             limits:
-              cpu: 500m
-              memory: 512Mi
+              cpu: 100m
+              memory: 128Mi
           ports:
             - containerPort: 80
           imagePullPolicy: IfNotPresent
@@ -696,7 +702,7 @@ metadata:
         add_header Cache-Control "public";
 spec:
   rules:
-    - host: headscale-${{ defaults.app_suffix }}.${{ SEALOS_CLOUD_DOMAIN }}
+    - host: ${{ inputs.domain || 'headscale-' + defaults.app_suffix + '.' + SEALOS_CLOUD_DOMAIN }}
       http:
         paths:
           - pathType: Prefix
@@ -708,8 +714,8 @@ spec:
                   number: 80
   tls:
     - hosts:
-        - headscale-${{ defaults.app_suffix }}.${{ SEALOS_CLOUD_DOMAIN }}
-      secretName: ${{ SEALOS_CERT_SECRET_NAME }}
+        - ${{ inputs.domain || 'headscale-' + defaults.app_suffix + '.' + SEALOS_CLOUD_DOMAIN }}
+      secretName: "${{ inputs.domain ? defaults.app_name + '-cert' : SEALOS_CERT_SECRET_NAME }}"
 
 ---
 apiVersion: app.sealos.io/v1
@@ -720,8 +726,46 @@ metadata:
     cloud.sealos.io/app-deploy-manager: ${{ defaults.app_name }}
 spec:
   data:
-    url: https://headscale-${{ defaults.app_suffix }}.${{ SEALOS_CLOUD_DOMAIN }}/admin
+    url: https://${{ inputs.domain || 'headscale-' + defaults.app_suffix + '.' + SEALOS_CLOUD_DOMAIN }}/admin
   displayType: normal
   icon: "https://raw.githubusercontent.com/juanfont/headscale/main/docs/logo/headscale3-dots.svg"
   name: "Headscale"
   type: iframe
+
+---
+${{ if(inputs.domain !== '') }}
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: ${{ defaults.app_name }}
+  labels:
+    cloud.sealos.io/app-deploy-manager: ${{ defaults.app_name }}
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: admin@sealos.io
+    privateKeySecretRef:
+      name: letsencrypt-prod
+    solvers:
+      - http01:
+          ingress:
+            class: nginx
+            serviceType: ClusterIP
+${{ endif() }}
+
+---
+${{ if(inputs.domain !== '') }}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: ${{ defaults.app_name }}-cert
+  labels:
+    cloud.sealos.io/app-deploy-manager: ${{ defaults.app_name }}
+spec:
+  secretName: ${{ defaults.app_name }}-cert
+  dnsNames:
+    - ${{ inputs.domain }}
+  issuerRef:
+    name: ${{ defaults.app_name }}
+    kind: Issuer
+${{ endif() }}

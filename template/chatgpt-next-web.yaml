@@ -22,6 +22,11 @@ spec:
       type: string
       value: chatgpt-next-web-${{ random(8) }}
   inputs:
+    DOMAIN:
+      description: '自定义域名'
+      type: string
+      default: ''
+      required: false
     OPENAI_API_KEY:
       description: '这是你在 OpenAI 账户页面申请的 API 密钥，使用英文逗号隔开多个 key，这样可以随机轮询这些 key'
       type: string
@@ -43,35 +48,43 @@ spec:
       default: ''
       required: false
     HIDE_USER_API_KEY:
-      description: '如果你不想让用户自行填入 API Key，将此环境变量设置为 1 即可'
-      type: string
-      default: ''
+      description: '如果你不想让用户自行填入 API Key，将勾选'
+      type: boolean
+      default: 'false'
       required: false
     DISABLE_GPT4:
-      description: '如果你不想让用户使用 GPT-4，将此环境变量设置为 1 即可'
-      type: string
-      default: ''
+      description: '如果你不想让用户使用 GPT-4，将勾选'
+      type: boolean
+      default: 'false'
       required: false
     HIDE_BALANCE_QUERY:
-      description: '如果你想启用余额查询功能，将此环境变量设置为 1 即可'
-      type: string
-      default: ''
+      description: '如果你想启用余额查询功能，将勾选'
+      type: boolean
+      default: 'false'
       required: false
-    AZURE_URL:
-      description: 'Azure 部署地址'
-      type: string
-      default: 'https://{azure-resource-url}/openai/deployments/{deploy-name}'
+    AUZRE_ENABLE:
+      description: '启用 Azure'
+      type: boolean
+      default: 'false'
       required: false
     AZURE_API_KEY:
       description: 'Azure 密钥'
       type: string
       default: ''
-      required: false
+      required: true
+      if: inputs.AUZRE_ENABLE === 'true'
+    AZURE_URL:
+      description: 'Azure 部署地址'
+      type: string
+      default: 'https://{azure-resource-url}/openai/deployments/{deploy-name}'
+      required: true
+      if: inputs.AUZRE_ENABLE === 'true'
     AZURE_API_VERSION:
       description: 'Azure API 版本'
       type: string
       default: ''
-      required: false
+      required: true
+      if: inputs.AUZRE_ENABLE === 'true'
 
 ---
 apiVersion: apps/v1
@@ -114,18 +127,26 @@ spec:
               value: ${{ inputs.BASE_URL }}
             - name: OPENAI_ORG_ID
               value: ${{ inputs.OPENAI_ORG_ID }}
+            ${{ if(inputs.HIDE_USER_API_KEY === 'true') }}
             - name: HIDE_USER_API_KEY
-              value: ${{ inputs.HIDE_USER_API_KEY }}
+              value: '1'
+            ${{ endif() }}
+            ${{ if(inputs.DISABLE_GPT4 === 'true') }}
             - name: DISABLE_GPT4
-              value: ${{ inputs.DISABLE_GPT4 }}
+              value: '1'
+            ${{ endif() }}
+            ${{ if(inputs.HIDE_BALANCE_QUERY === 'true') }}
             - name: HIDE_BALANCE_QUERY
-              value: ${{ inputs.HIDE_BALANCE_QUERY }}
+              value: '1'
+            ${{ endif() }}
+            ${{ if(inputs.AUZRE_ENABLE === 'true') }}
             - name: AZURE_URL
               value: ${{ inputs.AZURE_URL }}
             - name: AZURE_API_KEY
               value: ${{ inputs.AZURE_API_KEY }}
             - name: AZURE_API_VERSION
               value: ${{ inputs.AZURE_API_VERSION }}
+            ${{ endif() }}
           resources:
             requests:
               cpu: 100m
@@ -180,7 +201,7 @@ metadata:
       }
 spec:
   rules:
-    - host: ${{ defaults.app_host }}.${{ SEALOS_CLOUD_DOMAIN }}
+    - host: ${{ inputs.DOMAIN || 'headscale-' + defaults.app_suffix + '.' + SEALOS_CLOUD_DOMAIN }}
       http:
         paths:
           - pathType: Prefix
@@ -192,5 +213,43 @@ spec:
                   number: 3000
   tls:
     - hosts:
-        - ${{ defaults.app_host }}.${{ SEALOS_CLOUD_DOMAIN }}
-      secretName: ${{ SEALOS_CERT_SECRET_NAME }}
+        - ${{ inputs.DOMAIN || 'headscale-' + defaults.app_suffix + '.' + SEALOS_CLOUD_DOMAIN }}
+      secretName: "${{ inputs.DOMAIN ? defaults.app_name + '-cert' : SEALOS_CERT_SECRET_NAME }}"
+
+---
+${{ if(inputs.DOMAIN !== '') }}
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: ${{ defaults.app_name }}
+  labels:
+    cloud.sealos.io/app-deploy-manager: ${{ defaults.app_name }}
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: admin@sealos.io
+    privateKeySecretRef:
+      name: letsencrypt-prod
+    solvers:
+      - http01:
+          ingress:
+            class: nginx
+            serviceType: ClusterIP
+${{ endif() }}
+
+---
+${{ if(inputs.DOMAIN !== '') }}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: ${{ defaults.app_name }}-cert
+  labels:
+    cloud.sealos.io/app-deploy-manager: ${{ defaults.app_name }}
+spec:
+  secretName: ${{ defaults.app_name }}-cert
+  dnsNames:
+    - ${{ inputs.DOMAIN }}
+  issuerRef:
+    name: ${{ defaults.app_name }}
+    kind: Issuer
+${{ endif() }}
