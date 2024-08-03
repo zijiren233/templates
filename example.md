@@ -1039,7 +1039,7 @@ spec:
       value: chatgpt-next-web-${{ random(8) }}
   inputs:
     DOMAIN:
-      description: "Custom domain name, needs to be CNAME to: ${{ 'headscale-' + defaults.app_host + '.' + SEALOS_CLOUD_DOMAIN }}"
+      description: "Custom domain name, needs to be CNAME to: ${{ defaults.app_host + '.' + SEALOS_CLOUD_DOMAIN }}"
       type: string
       default: ''
       required: false
@@ -1217,7 +1217,7 @@ metadata:
       }
 spec:
   rules:
-    - host: ${{ inputs.DOMAIN || 'headscale-' + defaults.app_suffix + '.' + SEALOS_CLOUD_DOMAIN }}
+    - host: ${{ inputs.DOMAIN || defaults.app_host + '.' + SEALOS_CLOUD_DOMAIN }}
       http:
         paths:
           - pathType: Prefix
@@ -1229,7 +1229,7 @@ spec:
                   number: 3000
   tls:
     - hosts:
-        - ${{ inputs.DOMAIN || 'headscale-' + defaults.app_suffix + '.' + SEALOS_CLOUD_DOMAIN }}
+        - ${{ inputs.DOMAIN || defaults.app_host + '.' + SEALOS_CLOUD_DOMAIN }}
       secretName: "${{ inputs.DOMAIN ? defaults.app_name + '-cert' : SEALOS_CERT_SECRET_NAME }}"
 
 ---
