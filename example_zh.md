@@ -959,7 +959,11 @@ CRD本身会完全按照 `app.sealos.io/v1, Kind=Template` 的模板格式与字
 
 ### 渲染过程详解
 
-Sealos 模板引擎在渲染过程中遵循特定的顺序，确保变量和条件语句能够被正确解析。以下流程图详细展示了整个渲染过程：
+Sealos 模板引擎在渲染过程中遵循特定的顺序，确保变量和条件语句能够被正确解析。
+
+<details>
+
+<summary>以下流程图详细展示了整个渲染过程</summary>
 
 ```mermaid
 graph TD
@@ -981,6 +985,8 @@ graph TD
         K -- 重新执行步骤 2，解析应用程序资源文件 --> L[渲染完毕]
     end
 ```
+
+</details>
 
 - 解析 Template CR
   - 首先，系统读取 `Template CR` 文件
@@ -1010,7 +1016,7 @@ graph TD
 
 ### 条件渲染
 
-Sealos 模板引擎支持使用 `${{ if(expression) }}`、`${{ elif(expression) }}`、`${{ else }}` 和 `${{ endif() }}` 进行条件渲染。
+Sealos 模板引擎支持使用 `${{ if(expression) }}`、`${{ elif(expression) }}`、`${{ else() }}` 和 `${{ endif() }}` 进行条件渲染。
 
 - 条件语句必须单独占一行，不能与其他内容在同一行。
 - 条件表达式必须返回布尔值 (`true` 或 `false`)，否则会被强制转换为布尔值。
@@ -1027,7 +1033,9 @@ ${{ endif() }}
 
 这段代码表示，只有当 `inputs.enableIngress` 为 `true` 时，才会渲染 Ingress 资源。
 
-一个相对完整的例子是：
+<details>
+
+<summary>一个相对完整的例子</summary>
 
 ```yaml
 apiVersion: app.sealos.io/v1
@@ -1285,3 +1293,5 @@ spec:
     kind: Issuer
 ${{ endif() }}
 ```
+
+</details>

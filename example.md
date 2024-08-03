@@ -936,7 +936,11 @@ Where `app_name` is the name of the application deployed by the user, which is b
 
 ### Rendering Process Explained
 
-The Sealos template engine follows a specific order during the rendering process to ensure that variables and conditional statements are parsed correctly. The following flowchart details the entire rendering process:
+The Sealos template engine follows a specific order during the rendering process to ensure that variables and conditional statements are parsed correctly.
+
+<details>
+
+<summary>The following flowchart details the entire rendering process</summary>
 
 ```mermaid
 graph TD
@@ -958,6 +962,8 @@ graph TD
         K -- Re-execute step 2, parse application resource files --> L[Rendering completed]
     end
 ```
+
+</details>
 
 - **Parse Template CR**
   - First, the system reads the `Template CR` file.
@@ -987,7 +993,7 @@ graph TD
 
 ### Conditional Rendering
 
-The Sealos template engine supports conditional rendering using `${{ if(expression) }}`, `${{ elif(expression) }}`, `${{ else }}`, and `${{ endif() }}`.
+The Sealos template engine supports conditional rendering using `${{ if(expression) }}`, `${{ elif(expression) }}`, `${{ else() }}`, and `${{ endif() }}`.
 
 - Conditional statements must be on a separate line and cannot be on the same line as other content.
 - Conditional expressions must return a boolean value (`true` or `false`), otherwise they will be coerced into a boolean value.
@@ -1004,7 +1010,9 @@ ${{ endif() }}
 
 This code snippet indicates that the Ingress resource will only be rendered if `inputs.enableIngress` is `true`.
 
-A more complete example is:
+<details>
+
+<summary>A more complete example</summary>
 
 ```yaml
 apiVersion: app.sealos.io/v1
@@ -1262,3 +1270,5 @@ spec:
     kind: Issuer
 ${{ endif() }}
 ```
+
+</details>
