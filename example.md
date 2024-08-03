@@ -141,9 +141,15 @@ Sealos template engine uses the syntax of `${{ expression }}` to parse expressio
 
 **Built-in System Functions:**
 
-- `${{ random(length) }}` generate a random string of length `length`.
-- `${{ base64(string) }}` encode the string `string` into base64 format.
-- `${{ if(expression) }}` `${{ elif(expression) }}` `${{ else }}` `${{ endif() }}` Conditional rendering.
+- `${{ random(length) }}`: Generates a random string of length `length`.
+- `${{ base64(expression) }}`: Encodes the result of the expression into base64 format.
+  - `${{ base64('hello world') }}` will return `aGVsbG8gd29ybGQ=`.
+  - You can also reference variables, like `${{ base64(inputs.secret) }}`.
+
+> Note:
+>
+> You cannot use `${{ inputs.enabled }}` to determine whether to enable an option because `enabled` is a string, not a boolean.
+> You should use `${{ inputs.enabled === 'true' }}` to determine whether to enable an option.
 
 ## Part Two: `Application Resource File(s)`
 
@@ -973,10 +979,11 @@ graph TD
   - When the `Form` changes, it triggers a re-rendering of the `YAML` file list.
 
 > Note:
-> When the user enters information in the input box, the `Template CR` content will not be re-parsed,
+>
+> 1. When the user enters information in the input box, the `Template CR` content will not be re-parsed,
 > meaning that the original expression will not be re-evaluated, such as `value: ${{ random(8) }}`.
 >
-> Only changing the content in "Development" under "Debug Template Online" will trigger a re-parse.
+> 2. Only changing the content in "Development" under "Debug Template Online" will trigger a re-parse.
 
 ### Conditional Rendering
 
@@ -988,7 +995,7 @@ The Sealos template engine supports conditional rendering using `${{ if(expressi
 **Example:**
 
 ```yaml
-${{ if(inputs.enableIngress) }}
+${{ if(inputs.enableIngress === 'true') }}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 ...
